@@ -1,0 +1,192 @@
+API Specification for Zapnote Node Backend
+Base path: /api
+
+Authentication
+- Type: Bearer Token (Firebase ID token)
+- Header: Authorization: Bearer <ID_TOKEN>
+- Protected routes return 401 Unauthorized when missing/invalid token.
+
+Common error responses
+- 400 Bad Request
+  { "message": "..." }
+- 401 Unauthorized
+  { "message": "Unauthorized" } or { "message": "Invalid token" }
+- 403 Forbidden
+  { "message": "Access denied" } or { "message": "Insufficient permissions" }
+- 404 Not Found
+  { "message": "... not found" }
+- 500 Internal Server Error
+  { "error": "..." }
+
+1) POST /knowledge/{workspaceId}/documents
+- Description: Create a document in a workspace (requires role: EDITOR)
+- Auth: Bearer
+- Path params:
+  - workspaceId (string, required)
+- Request body (application/json):
+  {
+    "title": "string",
+    "content": "string"
+  }
+- Success Response 201 (application/json):
+  {
+    "id": "string",
+    "title": "string",
+    "content": "string",
+    "summary": "string | null",
+    "status": "PENDING|PROCESSING|COMPLETED|FAILED",
+    "workspaceId": "string",
+    "createdAt": "ISO8601 datetime",
+    "updatedAt": "ISO8601 datetime"
+  }
+- Errors: 400/401/403/500
+
+2) GET /knowledge/{workspaceId}/documents
+- Description: List documents in a workspace (requires role: VIEWER)
+- Auth: Bearer
+- Path params:
+  - workspaceId (string, required)
+- Query params (optional):
+  - limit (integer)
+- Success Response 200 (application/json):
+  [
+    { document object as above }
+  ]
+- Errors: 400/401/403/500
+
+3) GET /knowledge/{workspaceId}/documents/{id}
+- Description: Get a single document with chunks (requires role: VIEWER)
+- Auth: Bearer
+- Path params:
+  - workspaceId (string, required)
+  - id (string, required) - document id
+- Success Response 200 (application/json):
+  {
+    "id": "string",
+    "title": "string",
+    "content": "string",
+    "summary": "string | null",
+    "status": "PENDING|PROCESSING|COMPLETED|FAILED",
+    "workspaceId": "string",
+    "createdAt": "ISO8601 datetime",
+    "updatedAt": "ISO8601 datetime",
+    "chunks": [
+      {
+        "id": "string",
+        "content": "string",
+        "metadata": { /* optional */ } | null,
+        "documentId": "string"
+      }
+    ]
+  }
+- Errors: 400/401/403/404/500
+
+4) POST /search/{workspaceId}
+- Description: Semantic search across workspace documents
+- Auth: Bearer
+- Path params:
+  - workspaceId (string, required)
+- Request body (application/json):
+  {
+    "query": "string",
+    "limit": integer (optional, default 10)
+  }
+- Success Response 200 (application/json):
+  {
+    "results": [
+      {
+        "id": "chunk id",
+        "content": "string",
+        "documentId": "string",
+        "similarity": number (0..1)
+      }
+    ]
+  }
+- Notes: Implementation uses embeddings & vector similarity; ensure indexing/ingestion has run.
+- Errors: 400/401/403/500
+
+5) POST /spaces/{workspaceId}/spaces
+- Description: Create a space (requires role: EDITOR)
+- Auth: Bearer
+- Path params:
+  - workspaceId (string, required)
+- Request body (application/json):
+  { "name": "string" }
+- Success Response 201 (application/json):
+  {
+    "id": "string",
+    "name": "string",
+    "workspaceId": "string",
+    "createdAt": "ISO8601 datetime",
+    "updatedAt": "ISO8601 datetime"
+  }
+- Errors: 400/401/403/500
+
+6) GET /spaces/{workspaceId}/spaces
+- Description: List spaces in a workspace (requires role: VIEWER)
+- Auth: Bearer
+- Path params:
+  - workspaceId (string, required)
+- Success Response 200 (application/json):
+  [ { space object as above } ]
+- Errors: 400/401/403/500
+
+7) POST /chat/{workspaceId}
+- Description: RAG chat against workspace knowledge (requires role: VIEWER)
+- Auth: Bearer
+- Path params:
+  - workspaceId (string, required)
+- Request body (application/json):
+  {
+    "message": "string",                 // required
+    "documentId": "string",              // optional, narrow search to a document
+    "history": [                           // optional chat history to include
+      { "role": "user" | "model", "content": "string" }
+    ]
+  }
+- Success Response 200 (application/json):
+  {
+    "response": "string",                // LLM answer
+    "sources": [                           // retrieved context chunks
+      { "id": "chunk id", "content": "string", "documentId": "string", "similarity": number }
+    ]
+  }
+- Errors:
+  - 400 if missing message
+  - 401/403/500 as applicable
+
+8) GET /health
+- Description: Health check (no auth)
+- Success Response 200:
+  { "status": "ok" }
+
+Auth / User mapping details (middleware behavior)
+- `authenticate` middleware verifies Firebase ID token and ensures a `User` exists in DB:
+  1. Verify ID token via Firebase Admin SDK.
+  2. Extract `uid`, `email`, `name` from token.
+  3. Try to find user by `id = uid`.
+     - If found, update email/name if changed.
+     - If not found, attempt to find user by email (legacy linking).
+       - If found by email, keep that user id (legacy UUID) and update name if changed.
+       - If not found, create user with `id = uid`, `email`, `name`.
+  4. Attach `req.user = { id, email }` for downstream handlers.
+
+Testing guidance
+- Obtain Firebase ID token from client after sign-in (Email/Password or Google) and pass in `Authorization` header.
+- Use the following `curl` example for POST endpoints:
+
+  curl -X POST "http://localhost:3000/api/chat/{workspaceId}" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer <ID_TOKEN>" \
+    -d '{ "message": "What is in document X?", "documentId": "..." }'
+
+- For creating documents, ensure ingestion worker runs to split into chunks before testing RAG queries.
+
+Notes / Implementation caveats
+- Vector operations use raw SQL with `vector` extension; ensure DB has the extension and chunk embeddings stored as `vector`.
+- LLM and embedding SDK calls are in `src/ai/*`. For deterministic testing, stub `getEmbeddings` and `generateText`.
+- Role-based access enforced by `authorizeWorkspace` middleware which reads `WorkspaceMember` role.
+
+File: apispec.txt
+- This file (created at project root) contains the above human-readable API spec for quick testing and Postman import.
+

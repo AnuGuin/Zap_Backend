@@ -1,0 +1,98 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [vector]
+}
+
+enum Role {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspaces WorkspaceMember[]
+}
+
+model Workspace {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members   WorkspaceMember[]
+  documents Document[]
+  spaces    Space[]
+}
+
+model WorkspaceMember {
+  id          String    @id @default(uuid())
+  role        Role      @default(VIEWER)
+  userId      String
+  workspaceId String
+  user        User      @relation(fields: [userId], references: [id])
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@unique([userId, workspaceId])
+}
+
+model Document {
+  id          String           @id @default(uuid())
+  title       String
+  content     String           @db.Text
+  summary     String?          @db.Text
+  status      ProcessingStatus @default(PENDING)
+  workspaceId String
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id])
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  chunks DocumentChunk[]
+}
+
+model DocumentChunk {
+  id         String                 @id @default(uuid())
+  content    String                 @db.Text
+  embedding  Unsupported("vector")?
+  documentId String
+  document   Document               @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  metadata   Json?
+}
+
+model Space {
+  id          String    @id @default(uuid())
+  name        String
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  elements SpaceElement[]
+}
+
+model SpaceElement {
+  id        String   @id @default(uuid())
+  type      String // "note", "shape", "connector"
+  content   Json // Position, text, properties
+  spaceId   String
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
