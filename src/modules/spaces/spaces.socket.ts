@@ -16,8 +16,7 @@ export const setupSpacesSocket = (io: Server) => {
 
     socket.on('update-element', async (data: { spaceId: string; element: any }) => {
       const { spaceId, element } = data;
-      
-      // Persist to DB (debounced in real app, here direct)
+
       try {
         // Upsert element
         await prisma.spaceElement.upsert({
@@ -31,7 +30,6 @@ export const setupSpacesSocket = (io: Server) => {
           },
         });
 
-        // Broadcast to others in room
         socket.to(spaceId).emit('element-updated', element);
       } catch (error) {
         logger.error('Failed to update element', error);
@@ -40,7 +38,6 @@ export const setupSpacesSocket = (io: Server) => {
 
     socket.on('explain-space', async (spaceId: string) => {
       try {
-        // Fetch all elements
         const elements = await prisma.spaceElement.findMany({
           where: { spaceId },
         });
@@ -57,7 +54,6 @@ export const setupSpacesSocket = (io: Server) => {
 
         const explanation = await generateText(prompt);
         
-        // Send back to requester (or everyone?)
         socket.emit('space-explanation', { explanation });
       } catch (error) {
         logger.error('Failed to explain space', error);

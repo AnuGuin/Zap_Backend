@@ -40,6 +40,28 @@ model Workspace {
   members   WorkspaceMember[]
   documents Document[]
   spaces    Space[]
+  edges     Edge[]
+  aiUsage   AIUsage[]
+}
+
+model Edge {
+  id          String   @id @default(uuid())
+  type        String   // SUPPORTS, CONTRADICTS, RELATED
+  sourceId    String
+  targetId    String
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  createdAt   DateTime @default(now())
+}
+
+model AIUsage {
+  id          String   @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  action      String
+  model       String
+  tokens      Int      @default(0)
+  createdAt   DateTime @default(now())
 }
 
 model WorkspaceMember {

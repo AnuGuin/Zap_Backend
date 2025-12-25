@@ -9,7 +9,7 @@ const worker = new Worker('summarize', async (job: Job) => {
   const { documentId, content } = job.data;
   
   try {
-    // Truncate content if too long for context window (simple approach)
+    
     const truncatedContent = content.slice(0, 30000); 
     const prompt = summarizePrompt(truncatedContent);
     const summary = await generateText(prompt);
@@ -19,14 +19,6 @@ const worker = new Worker('summarize', async (job: Job) => {
       data: { summary },
     });
 
-    // Check if all tasks are done to mark as COMPLETED? 
-    // For simplicity, we might mark COMPLETED in a separate check or just let the UI poll.
-    // Or we can have a finalizer. 
-    // Let's just update status here if it's the last step, but parallel execution makes it hard.
-    // We'll leave status as PROCESSING until all are done, or just ignore status update here.
-    // Ideally, we track job completion.
-    
-    // Let's just set it to COMPLETED here for now, assuming this is the "main" visible output.
     await prisma.document.update({
       where: { id: documentId },
       data: { status: 'COMPLETED' },

@@ -10,8 +10,6 @@ const worker = new Worker('embed', async (job: Job) => {
   try {
     const embedding = await getEmbeddings(content);
     
-    // Update with vector data using raw query for Unsupported type
-    // Ensure pgvector extension is enabled in migration
     const vectorString = `[${embedding.join(',')}]`;
     
     await prisma.$executeRaw`

@@ -5,7 +5,6 @@ import { env } from './env';
 if (!admin.apps.length) {
   try {
     admin.initializeApp({
-      // applicationDefault() looks for the credentials created by 'gcloud auth application-default login'
       credential: admin.credential.applicationDefault(),
       projectId: env.GOOGLE_PROJECT_ID,
     });

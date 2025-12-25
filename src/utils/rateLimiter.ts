@@ -20,7 +20,6 @@ export const rateLimiter = (limit: number, windowSeconds: number) => {
       next();
     } catch (error) {
       console.error('Rate limiter error', error);
-      // Fail open
       next();
     }
   };

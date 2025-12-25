@@ -18,11 +18,8 @@ const worker = new Worker('ingest', async (job: Job) => {
       data: { status: 'PROCESSING' },
     });
 
-    // 1. Chunking
     const chunks = chunkText(document.content);
     
-    // 2. Create chunks in DB (without embeddings yet)
-    // We create them first so we have IDs to pass to embed worker
     const createdChunks = await prisma.$transaction(
       chunks.map((content) => 
         prisma.documentChunk.create({
@@ -34,7 +31,6 @@ const worker = new Worker('ingest', async (job: Job) => {
       )
     );
 
-    // 3. Queue Embedding Jobs
     await embedQueue.addBulk(
       createdChunks.map((chunk) => ({
         name: 'embed-chunk',
@@ -42,10 +38,10 @@ const worker = new Worker('ingest', async (job: Job) => {
       }))
     );
 
-    // 4. Queue Summarization
+
     await summarizeQueue.add('summarize-doc', { documentId, content: document.content });
 
-    // 5. Queue Classification
+
     await classifyQueue.add('classify-doc', { documentId, content: document.content });
 
     logger.info(`Ingestion steps queued for document ${documentId}`);

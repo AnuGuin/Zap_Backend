@@ -9,12 +9,10 @@ export const chatWithKnowledge = async (
 ): Promise<ChatResponseDto> => {
   const { message, workspaceId, documentId, history } = data;
 
-  // 1. Generate embedding for the user query
   const embedding = await getEmbeddings(message);
   const vectorString = `[${embedding.join(',')}]`;
 
-  // 2. Retrieve relevant chunks
-  // We use a raw query because Prisma doesn't support vector operations natively yet in the typed client
+
   let results: any[] = [];
 
   if (documentId) {
@@ -44,7 +42,6 @@ export const chatWithKnowledge = async (
     `;
   }
 
-  // 3. Construct the prompt
   const context = results.map((r) => r.content).join('\n\n');
   
   const systemPrompt = `You are a helpful AI assistant for the Zapnote workspace.
@@ -56,9 +53,7 @@ Context:
 ${context}
 `;
 
-  // Format history for the prompt if needed, or just append the current message
-  // For simplicity, we'll just use the system prompt + current message for now, 
-  // but a real implementation would format the history for the LLM.
+
   
   let fullPrompt = `${systemPrompt}\n\nUser: ${message}\nAssistant:`;
   
@@ -67,7 +62,6 @@ ${context}
      fullPrompt = `${systemPrompt}\n\n${historyText}\nUser: ${message}\nAssistant:`;
   }
 
-  // 4. Generate response
   const responseText = await generateText(fullPrompt);
 
   return {

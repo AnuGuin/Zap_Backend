@@ -8,7 +8,6 @@ export const chunkText = (text: string, chunkSize: number = 1000, overlap: numbe
     let endIndex = startIndex + chunkSize;
     
     if (endIndex < text.length) {
-      // Try to find a natural break point (newline, period, space)
       const lookback = text.slice(startIndex, endIndex);
       const lastNewLine = lookback.lastIndexOf('\n');
       const lastPeriod = lookback.lastIndexOf('. ');
@@ -26,7 +25,6 @@ export const chunkText = (text: string, chunkSize: number = 1000, overlap: numbe
     chunks.push(text.slice(startIndex, endIndex).trim());
     startIndex = endIndex - overlap;
     
-    // Prevent infinite loops if overlap >= chunkSize (shouldn't happen with defaults)
     if (startIndex >= endIndex) {
         startIndex = endIndex;
     }

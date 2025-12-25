@@ -24,13 +24,11 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
       return res.status(400).json({ message: 'Email is required for authentication' });
     }
 
-    // 1. Try to find user by Firebase UID
     let user = await prisma.user.findUnique({
       where: { id: uid },
     });
 
     if (user) {
-      // User exists by UID, update details if changed
       if (user.email !== email || (name && user.name !== name)) {
         user = await prisma.user.update({
           where: { id: uid },
@@ -41,14 +39,11 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
         });
       }
     } else {
-      // 2. If not found by UID, try to find by email (legacy/linking)
       user = await prisma.user.findUnique({
         where: { email },
       });
 
       if (user) {
-        // User exists by email but has different ID (legacy UUID)
-        // We use the existing user record.
         if (name && user.name !== name) {
           user = await prisma.user.update({
             where: { id: user.id },
@@ -56,7 +51,6 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
           });
         }
       } else {
-        // 3. Create new user
         user = await prisma.user.create({
           data: {
             id: uid,

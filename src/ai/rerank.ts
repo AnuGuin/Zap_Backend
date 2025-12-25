@@ -22,13 +22,11 @@ Ranking:
     
     const indices = text.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
     
-    // Map back to documents
     const rankedDocs: string[] = [];
     indices.forEach(i => {
       if (documents[i]) rankedDocs.push(documents[i]);
     });
     
-    // Append any missing docs at the end
     documents.forEach((doc, i) => {
       if (!indices.includes(i)) rankedDocs.push(doc);
     });
