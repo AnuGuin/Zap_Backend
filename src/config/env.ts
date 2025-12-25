@@ -8,6 +8,7 @@ const envSchema = z.object({
   PORT: z.string().default('3000'),
   DATABASE_URL: z.string(),
   REDIS_URL: z.string().default('redis://localhost:6379'),
+  GOOGLE_API_KEY: z.string(),
   GOOGLE_PROJECT_ID: z.string(),
   GOOGLE_LOCATION: z.string().default('us-central1'),
   FIREBASE_PROJECT_ID: z.string().optional(),

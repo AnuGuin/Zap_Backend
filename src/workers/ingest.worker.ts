@@ -2,7 +2,7 @@ import { Worker, Job } from 'bullmq';
 import { env } from '../config/env';
 import prisma from '../config/db';
 import { chunkText } from '../utils/chunker';
-import { embedQueue, summarizeQueue, classifyQueue } from '../events/queue';
+import { embedQueue, summarizeQueue, classifyQueue, enrichmentQueue } from '../events/queue';
 import { logger } from '../utils/logger';
 
 const worker = new Worker('ingest', async (job: Job) => {
@@ -43,6 +43,11 @@ const worker = new Worker('ingest', async (job: Job) => {
 
 
     await classifyQueue.add('classify-doc', { documentId, content: document.content });
+
+    await enrichmentQueue.add('enrich', {
+      documentId: document.id,
+      content: document.content 
+});
 
     logger.info(`Ingestion steps queued for document ${documentId}`);
 

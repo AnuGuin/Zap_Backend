@@ -87,6 +87,31 @@ model Document {
   updatedAt   DateTime         @updatedAt
 
   chunks DocumentChunk[]
+  entities EntityOnDocument[]
+}
+
+model Entity {
+  id          String   @id @default(uuid())
+  kgId        String   @unique 
+  name        String
+  description String?  @db.Text
+  imageUrl    String?
+  url         String?
+  type        String?  
+  createdAt   DateTime @default(now())
+
+  documents   EntityOnDocument[]
+}
+
+model EntityOnDocument {
+  documentId String
+  entityId   String
+  confidence Float
+
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  entity     Entity   @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, entityId])
 }
 
 model DocumentChunk {
