@@ -16,8 +16,13 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
-// Global Rate Limiter (100 req / 1 min)
-app.use(rateLimiter(100, 60));
+// Health Check 
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
+// Global Rate Limiter 
+app.use(rateLimiter(50, 60));
 
 // Routes
 app.use('/api/knowledge', knowledgeRoutes);
@@ -25,9 +30,13 @@ app.use('/api/search', searchRoutes);
 app.use('/api/spaces', spacesRoutes);
 app.use('/api/chat', chatRoutes);
 
-// Health Check
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
+//Global Error Handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('[Global Error]', err);
+  res.status(err.status || 500).json({
+    status: 'error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error',
+  });
 });
 
 export default app;

@@ -18,7 +18,6 @@ export const setupSpacesSocket = (io: Server) => {
       const { spaceId, element } = data;
 
       try {
-        // Upsert element
         await prisma.spaceElement.upsert({
           where: { id: element.id },
           update: { content: element.content, type: element.type },
@@ -36,29 +35,20 @@ export const setupSpacesSocket = (io: Server) => {
       }
     });
 
-    socket.on('explain-space', async (spaceId: string) => {
-      try {
-        const elements = await prisma.spaceElement.findMany({
-          where: { spaceId },
-        });
-
-        const context = JSON.stringify(elements.map(e => e.content));
-        const prompt = `
-          Explain the contents of this whiteboard space. 
-          The elements are described in JSON format below.
-          Provide a cohesive summary of the ideas presented.
-
-          Elements:
-          ${context}
-        `;
-
-        const explanation = await generateText(prompt);
-        
-        socket.emit('space-explanation', { explanation });
-      } catch (error) {
-        logger.error('Failed to explain space', error);
-        socket.emit('error', { message: 'Failed to generate explanation' });
-      }
+    socket.on('explain-space', (spaceId: string) => { 
+      (async () => {
+        try {
+          const elements = await prisma.spaceElement.findMany({ where: { spaceId } });
+          const context = JSON.stringify(elements.map(e => e.content));
+          const prompt = `Explain this whiteboard: ${context}`;
+          
+          const explanation = await generateText(prompt);
+          socket.emit('space-explanation', { explanation });
+        } catch (error) {
+          logger.error('Failed to explain space', error);
+          socket.emit('error', { message: 'AI generation failed' });
+        }
+      })();
     });
 
     socket.on('disconnect', () => {
