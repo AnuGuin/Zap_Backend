@@ -9,7 +9,7 @@ if (process.env.GOOGLE_CREDENTIALS_BASE64) {
     const tempPath = path.resolve(process.cwd(), 'google-credentials.json');
     fs.writeFileSync(tempPath, credentials);
     process.env.GOOGLE_APPLICATION_CREDENTIALS = tempPath;
-    console.log('Google Cloud Credentials loaded');
+    console.log('Google Cloud Credentials loaded from environment');
   } catch (error) {
     console.error('Failed to load Google Credentials:', error);
   }
@@ -32,7 +32,7 @@ const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
     methods: ['GET', 'POST'],
-    credentials: true 
+    credentials: true
   },
 });
 

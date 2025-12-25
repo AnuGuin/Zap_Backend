@@ -16,21 +16,7 @@
   "author": "",
   "license": "ISC",
   "type": "module",
-  "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
-    "@types/morgan": "^1.9.10",
-    "@types/node": "^25.0.3",
-    "@types/pg": "^8.16.0",
-    "@types/socket.io": "^3.0.1",
-    "@types/uuid": "^10.0.0",
-    "@types/ws": "^8.18.1",
-    "ts-node": "^10.9.2",
-    "tsup": "^8.5.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
-  },
-  "dependencies": {
+ "dependencies": {
     "@google-cloud/pubsub": "^5.2.0",
     "@google-cloud/vertexai": "^1.10.0",
     "@google-cloud/vision": "^5.3.4",
@@ -53,8 +39,22 @@
     "readability-node": "^0.1.0",
     "redis": "^5.10.0",
     "socket.io": "^4.8.3",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
     "uuid": "^13.0.0",
     "ws": "^8.18.3",
     "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/morgan": "^1.9.10",
+    "@types/node": "^25.0.3",
+    "@types/pg": "^8.16.0",
+    "@types/socket.io": "^3.0.1",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.18.1",
+    "ts-node": "^10.9.2"
   }
 }

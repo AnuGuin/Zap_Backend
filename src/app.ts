@@ -11,11 +11,12 @@ import chatRoutes from './modules/chat/chat.routes';
 const app = express();
 
 const allowedOrigins = [
-  process.env.FRONTEND_URL,       // Your Vercel App
-  "http://localhost:3000",        // Local React/Next.js
-  "http://localhost:5173"         // Local Vite
+  process.env.FRONTEND_URL, 
+  "http://localhost:3000",
+  "http://localhost:5173"
 ].filter(Boolean) as string[];
 
+// Middleware
 app.use(helmet());
 
 app.use(cors({
@@ -25,10 +26,11 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.log('Blocked by CORS:', origin); 
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true, 
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 
