@@ -10,9 +10,28 @@ import chatRoutes from './modules/chat/chat.routes';
 
 const app = express();
 
-// Middleware
+const allowedOrigins = [
+  process.env.FRONTEND_URL,       // Your Vercel App
+  "http://localhost:3000",        // Local React/Next.js
+  "http://localhost:5173"         // Local Vite
+].filter(Boolean) as string[];
+
 app.use(helmet());
-app.use(cors());
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true, 
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+}));
+
 app.use(express.json());
 app.use(morgan('dev'));
 
@@ -30,7 +49,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/spaces', spacesRoutes);
 app.use('/api/chat', chatRoutes);
 
-//Global Error Handler
+// Global Error Handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('[Global Error]', err);
   res.status(err.status || 500).json({
