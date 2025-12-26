@@ -10,11 +10,13 @@ export const summarizeQueue = new Queue('summarize', { connection });
 export const embedQueue = new Queue('embed', { connection });
 export const classifyQueue = new Queue('classify', { connection });
 export const enrichmentQueue = new Queue('enrichment', { connection });
+export const generateTagsQueue = new Queue('generate-tags', { connection });
 
 export const queues = {
   ingest: ingestQueue,
   summarize: summarizeQueue,
   embed: embedQueue,
   classify: classifyQueue,
-  enrichmentQueue: enrichmentQueue
+  enrichmentQueue: enrichmentQueue,
+  generateTags: generateTagsQueue
 };

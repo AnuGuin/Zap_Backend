@@ -2,30 +2,77 @@ import { Worker, Job } from 'bullmq';
 import { env } from '../config/env';
 import prisma from '../config/db';
 import { chunkText } from '../utils/chunker';
-import { embedQueue, summarizeQueue, classifyQueue, enrichmentQueue } from '../events/queue';
+import { embedQueue, summarizeQueue, classifyQueue, enrichmentQueue, generateTagsQueue } from '../events/queue';
 import { logger } from '../utils/logger';
+import { extractContentFromUrl } from '../utils/urlExtractor';
 
-const worker = new Worker('ingest', async (job: Job) => {
-  const { documentId } = job.data;
+interface IngestJobData {
+  documentId: string;
+  url?: string;
+  userIntent?: string;
+}
+
+const worker = new Worker('ingest', async (job: Job<IngestJobData>) => {
+  const { documentId, url, userIntent } = job.data;
   logger.info(`Starting ingestion for document ${documentId}`);
 
   try {
-    const document = await prisma.document.findUnique({ where: { id: documentId } });
+    let document = await prisma.knowledgeItem.findUnique({ where: { id: documentId } });
     if (!document) throw new Error('Document not found');
 
-    await prisma.document.update({
+    await prisma.knowledgeItem.update({
       where: { id: documentId },
       data: { status: 'PROCESSING' },
     });
 
-    const chunks = chunkText(document.content);
+    let content = document.content || '';
+    let title = document.title;
+    let metadata = document.metadata as any || {};
+
+    if (url) {
+      logger.info(`Extracting content from URL: ${url}`);
+      const extracted = await extractContentFromUrl(url);
+      
+      content = extracted.content;
+      title = extracted.title;
+      
+      metadata = {
+        ...metadata,
+        excerpt: extracted.excerpt,
+        byline: extracted.byline,
+        siteName: extracted.siteName,
+        publishedTime: extracted.publishedTime,
+        favicon: extracted.favicon,
+        userIntent: userIntent || ''
+      };
+
+      // Update document with extracted content
+      await prisma.knowledgeItem.update({
+        where: { id: documentId },
+        data: {
+          content,
+          title,
+          metadata,
+          type: 'URL'
+        }
+      });
+      
+      document = await prisma.knowledgeItem.findUnique({ where: { id: documentId } });
+      if (!document) throw new Error('Document not found after update');
+    }
+
+    if (!content) {
+      throw new Error('No content available for processing');
+    }
+
+    const chunks = chunkText(content);
     
     const createdChunks = await prisma.$transaction(
-      chunks.map((content) => 
+      chunks.map((chunkContent) => 
         prisma.documentChunk.create({
           data: {
-            content,
-            documentId,
+            content: chunkContent,
+            knowledgeItemId: documentId,
           },
         })
       )
@@ -38,22 +85,30 @@ const worker = new Worker('ingest', async (job: Job) => {
       }))
     );
 
+    await summarizeQueue.add('summarize-doc', { documentId, content });
 
-    await summarizeQueue.add('summarize-doc', { documentId, content: document.content });
-
-
-    await classifyQueue.add('classify-doc', { documentId, content: document.content });
+    await classifyQueue.add('classify-doc', { documentId, content });
 
     await enrichmentQueue.add('enrich', {
       documentId: document.id,
-      content: document.content 
-});
+      content 
+    });
+
+    // Add tag generation job
+    if (userIntent) {
+      await generateTagsQueue.add('generate-tags', {
+        documentId,
+        content,
+        userIntent
+      });
+      logger.info(`Tag generation queued for document ${documentId}`);
+    }
 
     logger.info(`Ingestion steps queued for document ${documentId}`);
 
   } catch (error) {
     logger.error(`Ingestion failed for document ${documentId}`, error);
-    await prisma.document.update({
+    await prisma.knowledgeItem.update({
       where: { id: documentId },
       data: { status: 'FAILED' },
     });

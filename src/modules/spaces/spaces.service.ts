@@ -2,9 +2,7 @@ import prisma from '../../config/db';
 import { generateText } from '../../ai/llm';
 import { getEmbeddings } from '../../ai/embeddings';
 
-// 1. Space -> Auto-Suggest Related Knowledge
 export const suggestRelatedKnowledge = async (workspaceId: string, spaceId: string) => {
-  // Get space content
   const space = await prisma.space.findUnique({
     where: { id: spaceId },
     include: { elements: true },
@@ -12,23 +10,19 @@ export const suggestRelatedKnowledge = async (workspaceId: string, spaceId: stri
 
   if (!space) throw new Error('Space not found');
 
-  // Aggregate content from space elements (notes, etc.)
   const spaceContent = space.elements
     .map((el: any) => {
       const content = el.content as any;
       return content.text || '';
     })
     .join('\n')
-    .slice(0, 5000); // Limit context
+    .slice(0, 5000);
 
   if (!spaceContent) return [];
 
-  // Embed space content
   const embedding = await getEmbeddings(spaceContent);
   const vectorString = `[${embedding.join(',')}]`;
 
-  // Find relevant chunks not in space (simplified: just find relevant chunks for now)
-  // In a real app, we'd filter out docs already linked to the space.
   const chunks = await prisma.$queryRaw`
     SELECT 
       doc.id as "documentId",
@@ -42,12 +36,10 @@ export const suggestRelatedKnowledge = async (workspaceId: string, spaceId: stri
     LIMIT 10
   ` as any[];
 
-  // Deduplicate by documentId
   const uniqueDocs = Array.from(new Set(chunks.map(c => c.documentId)))
     .map(id => chunks.find(c => c.documentId === id))
     .slice(0, 5);
 
-  // Use LLM to explain relevance
   const suggestions = await Promise.all(uniqueDocs.map(async (doc) => {
     const prompt = `
       Context: Space content: "${spaceContent.slice(0, 500)}..."
@@ -72,7 +64,6 @@ export const suggestRelatedKnowledge = async (workspaceId: string, spaceId: stri
   return suggestions;
 };
 
-// 2. Cross-Space Reasoning
 export const compareSpaces = async (workspaceId: string, spaceId1: string, spaceId2: string) => {
   const [s1, s2] = await Promise.all([
     prisma.space.findUnique({ where: { id: spaceId1 }, include: { elements: true } }),
@@ -100,7 +91,6 @@ export const compareSpaces = async (workspaceId: string, spaceId1: string, space
   const response = await generateText(prompt, { workspaceId, action: 'compare-spaces' });
   
   try {
-    // Clean markdown code blocks if present
     const jsonStr = response.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(jsonStr);
   } catch (e) {
@@ -108,7 +98,6 @@ export const compareSpaces = async (workspaceId: string, spaceId1: string, space
   }
 };
 
-// 3. Knowledge Graph Edges (Suggestions)
 export const suggestEdges = async (workspaceId: string, spaceId: string) => {
   const space = await prisma.space.findUnique({ 
     where: { id: spaceId }, 
@@ -120,7 +109,7 @@ export const suggestEdges = async (workspaceId: string, spaceId: string) => {
   const elements = space.elements.map((e: any) => ({
     id: e.id,
     text: (e.content as any).text || ''
-  })).filter(e => e.text.length > 10).slice(0, 10); // Limit to 10 elements for analysis
+  })).filter(e => e.text.length > 10).slice(0, 10); 
 
   if (elements.length < 2) return [];
 
@@ -144,7 +133,6 @@ export const suggestEdges = async (workspaceId: string, spaceId: string) => {
   }
 };
 
-// 4. Learning Gap Detection
 export const detectGaps = async (workspaceId: string, spaceId: string) => {
   const space = await prisma.space.findUnique({ 
     where: { id: spaceId }, 

@@ -14,12 +14,12 @@ const worker = new Worker('summarize', async (job: Job) => {
     const prompt = summarizePrompt(truncatedContent);
     const summary = await generateText(prompt);
 
-    await prisma.document.update({
+    await prisma.knowledgeItem.update({
       where: { id: documentId },
       data: { summary },
     });
 
-    await prisma.document.update({
+    await prisma.knowledgeItem.update({
       where: { id: documentId },
       data: { status: 'COMPLETED' },
     });

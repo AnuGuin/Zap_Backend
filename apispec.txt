@@ -8,7 +8,7 @@ Authentication
 
 Common error responses
 - 400 Bad Request
-  { "message": "..." }
+  { "error": "..." }
 - 401 Unauthorized
   { "message": "Unauthorized" } or { "message": "Invalid token" }
 - 403 Forbidden
@@ -16,57 +16,103 @@ Common error responses
 - 404 Not Found
   { "message": "... not found" }
 - 500 Internal Server Error
-  { "error": "..." }
+  { "error": "...", "details": "..." }
 
-1) POST /knowledge/{workspaceId}/documents
-- Description: Create a document in a workspace (requires role: EDITOR)
+1) POST /knowledge/{workspaceId}/knowledge
+- Description: Create a knowledge item from URL with AI processing (requires role: EDITOR)
 - Auth: Bearer
 - Path params:
   - workspaceId (string, required)
 - Request body (application/json):
   {
-    "title": "string",
-    "content": "string"
+    "url": "string",      // Required: URL to extract content from
+    "intent": "string"    // Required: User's purpose/intent for saving this
   }
 - Success Response 201 (application/json):
   {
-    "id": "string",
-    "title": "string",
-    "content": "string",
-    "summary": "string | null",
-    "status": "PENDING|PROCESSING|COMPLETED|FAILED",
-    "workspaceId": "string",
-    "createdAt": "ISO8601 datetime",
-    "updatedAt": "ISO8601 datetime"
+    "message": "Knowledge item created and processing started",
+    "data": {
+      "id": "string",
+      "title": "string",
+      "content": "string | null",
+      "summary": "string | null",
+      "sourceUrl": "string",
+      "type": "URL|PDF|TEXT|YOUTUBE|IMAGE",
+      "status": "PENDING|PROCESSING|COMPLETED|FAILED",
+      "metadata": {
+        "excerpt": "string",
+        "byline": "string",
+        "siteName": "string",
+        "publishedTime": "string",
+        "favicon": "string",
+        "userIntent": "string"
+      },
+      "workspaceId": "string",
+      "createdAt": "ISO8601 datetime",
+      "updatedAt": "ISO8601 datetime"
+    }
   }
-- Errors: 400/401/403/500
+- Processing Pipeline (automatic):
+  - Content extraction from URL
+  - Chunking and embedding
+  - AI summarization
+  - Content classification
+  - Entity extraction and enrichment
+  - AI-powered tag generation based on content + intent
+- Errors: 400 (missing url/intent), 401, 403, 500
 
-2) GET /knowledge/{workspaceId}/documents
-- Description: List documents in a workspace (requires role: VIEWER)
+2) GET /knowledge/{workspaceId}/knowledge
+- Description: List all knowledge items in workspace with tags and entities (requires role: VIEWER)
 - Auth: Bearer
 - Path params:
   - workspaceId (string, required)
-- Query params (optional):
-  - limit (integer)
 - Success Response 200 (application/json):
   [
-    { document object as above }
+    {
+      "id": "string",
+      "title": "string",
+      "content": "string",
+      "summary": "string | null",
+      "sourceUrl": "string | null",
+      "type": "URL|PDF|TEXT|YOUTUBE|IMAGE",
+      "status": "PENDING|PROCESSING|COMPLETED|FAILED",
+      "metadata": { /* optional metadata */ },
+      "workspaceId": "string",
+      "createdAt": "ISO8601 datetime",
+      "updatedAt": "ISO8601 datetime",
+      "tags": [
+        { "id": "string", "name": "string" }
+      ],
+      "entities": [
+        {
+          "id": "string",
+          "name": "string",
+          "type": "string",
+          "description": "string | null",
+          "imageUrl": "string | null",
+          "url": "string | null"
+        }
+      ]
+    }
   ]
 - Errors: 400/401/403/500
 
-3) GET /knowledge/{workspaceId}/documents/{id}
-- Description: Get a single document with chunks (requires role: VIEWER)
+3) GET /knowledge/{workspaceId}/knowledge/{id}
+- Description: Get single knowledge item with chunks, tags, and entities (requires role: VIEWER)
 - Auth: Bearer
 - Path params:
   - workspaceId (string, required)
-  - id (string, required) - document id
+  - id (string, required) - knowledge item id
 - Success Response 200 (application/json):
   {
     "id": "string",
     "title": "string",
     "content": "string",
     "summary": "string | null",
+    "sourceUrl": "string | null",
+    "type": "URL|PDF|TEXT|YOUTUBE|IMAGE",
     "status": "PENDING|PROCESSING|COMPLETED|FAILED",
+    "metadata": { /* metadata including userIntent */ },
     "workspaceId": "string",
     "createdAt": "ISO8601 datetime",
     "updatedAt": "ISO8601 datetime",
@@ -75,7 +121,24 @@ Common error responses
         "id": "string",
         "content": "string",
         "metadata": { /* optional */ } | null,
-        "documentId": "string"
+        "knowledgeItemId": "string"
+      }
+    ],
+    "tags": [
+      { "id": "string", "name": "string" }
+    ],
+    "entities": [
+      {
+        "entityId": "string",
+        "confidence": number,
+        "entity": {
+          "id": "string",
+          "name": "string",
+          "type": "string",
+          "description": "string | null",
+          "imageUrl": "string | null",
+          "url": "string | null"
+        }
       }
     ]
   }
@@ -173,19 +236,36 @@ Auth / User mapping details (middleware behavior)
 
 Testing guidance
 - Obtain Firebase ID token from client after sign-in (Email/Password or Google) and pass in `Authorization` header.
-- Use the following `curl` example for POST endpoints:
+- Example: Create knowledge item from URL:
+
+  curl -X POST "http://localhost:3000/api/knowledge/{workspaceId}/knowledge" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer <ID_TOKEN>" \
+    -d '{"url": "https://example.com/article", "intent": "Research for my AI project"}'
+
+- Example: Chat with RAG:
 
   curl -X POST "http://localhost:3000/api/chat/{workspaceId}" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer <ID_TOKEN>" \
-    -d '{ "message": "What is in document X?", "documentId": "..." }'
+    -d '{"message": "What is in document X?", "documentId": "..."}'
 
-- For creating documents, ensure ingestion worker runs to split into chunks before testing RAG queries.
+- Processing is asynchronous via BullMQ workers. Monitor status field (PENDING → PROCESSING → COMPLETED).
+- Ensure Redis is running for queue processing and all workers are initialized.
 
 Notes / Implementation caveats
 - Vector operations use raw SQL with `vector` extension; ensure DB has the extension and chunk embeddings stored as `vector`.
-- LLM and embedding SDK calls are in `src/ai/*`. For deterministic testing, stub `getEmbeddings` and `generateText`.
+- LLM and embedding SDK calls are in `src/ai/*`. Uses Google Vertex AI (Gemini models).
+- Content extraction uses Mozilla Readability + JSDOM for clean text extraction.
+- Entity enrichment uses Google Knowledge Graph API (requires GOOGLE_API_KEY in .env).
 - Role-based access enforced by `authorizeWorkspace` middleware which reads `WorkspaceMember` role.
+- Background processing uses BullMQ with Redis:
+  - ingest: Extracts content from URL, creates chunks
+  - embed: Generates vector embeddings
+  - summarize: AI-powered summarization
+  - classify: Content classification
+  - enrichment: Entity extraction and Knowledge Graph enrichment
+  - generate-tags: AI tag generation based on content + user intent
 
 File: apispec.txt
 - This file (created at project root) contains the above human-readable API spec for quick testing and Postman import.

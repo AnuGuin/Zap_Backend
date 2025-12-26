@@ -5,7 +5,6 @@ import * as SpacesService from './spaces.service';
 
 const router = Router();
 
-// ... existing routes ...
 
 router.post(
   '/:workspaceId/spaces',
@@ -42,7 +41,6 @@ router.get(
   }
 );
 
-// 1. Suggestions
 router.get(
   '/:workspaceId/spaces/:spaceId/suggestions',
   authenticate,
@@ -61,7 +59,6 @@ router.get(
   }
 );
 
-// 2. Compare
 router.post(
   '/:workspaceId/spaces/compare',
   authenticate,
@@ -82,7 +79,6 @@ router.post(
   }
 );
 
-// 3. Edges
 router.get(
   '/:workspaceId/spaces/:spaceId/edges/suggest',
   authenticate,
@@ -121,7 +117,6 @@ router.post(
   }
 );
 
-// 4. Gaps
 router.get(
   '/:workspaceId/spaces/:spaceId/gaps',
   authenticate,

@@ -8,7 +8,7 @@ import { logger } from '../utils/logger';
 
 const worker = new Worker('enrichment', async (job: Job) => {
   const { documentId, content } = job.data;
-  logger.info(`Starting enrichment for document ${documentId}`);
+  logger.info(`Starting enrichment for url ${documentId}`);
 
   try {
     const prompt = extractEntitiesPrompt(content);
@@ -32,14 +32,18 @@ const worker = new Worker('enrichment', async (job: Job) => {
       if (kgData && kgData.score > 50) { 
         const entity = await prisma.entity.upsert({
           where: { kgId: kgData.kgId },
-          update: {}, // No update needed if exists
+          update: {
+            ...(kgData.description && { description: kgData.description }),
+            ...(kgData.imageUrl && { imageUrl: kgData.imageUrl }),
+            ...(kgData.url && { url: kgData.url }),
+          },
           create: {
             kgId: kgData.kgId,
             name: kgData.name,
-            description: kgData.description ?? null,
-            imageUrl: kgData.imageUrl ?? null,
-            url: kgData.url ?? null,
-            type: kgData.type ?? null
+            description: kgData.description || null,
+            imageUrl: kgData.imageUrl || null,
+            url: kgData.url || null,
+            type: kgData.type || 'Concept'
           }
         });
         
@@ -47,7 +51,7 @@ const worker = new Worker('enrichment', async (job: Job) => {
           data: {
             documentId,
             entityId: entity.id,
-            confidence: kgData.score
+            confidence: kgData.score / 100
           }
         }).catch(() => {
           // Ignore unique constraint violation (already linked)

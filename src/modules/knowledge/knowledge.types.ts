@@ -1,6 +1,6 @@
 export interface CreateDocumentDto {
-  title: string;
-  content: string;
+  url: string;
+  intent: string;
   workspaceId: string;
 }
 

@@ -1,12 +1,13 @@
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["postgresqlExtensions"]
+  previewFeatures = ["postgresqlExtensions"] 
 }
 
 datasource db {
   provider   = "postgresql"
   extensions = [vector]
 }
+
 
 enum Role {
   OWNER
@@ -21,6 +22,15 @@ enum ProcessingStatus {
   FAILED
 }
 
+enum KnowledgeType {
+  PDF
+  URL     
+  TEXT
+  YOUTUBE
+  IMAGE
+}
+
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -28,7 +38,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  workspaces WorkspaceMember[]
+  workspaces     WorkspaceMember[]
+  createdItems   KnowledgeItem[]
 }
 
 model Workspace {
@@ -38,96 +49,97 @@ model Workspace {
   updatedAt DateTime @updatedAt
 
   members   WorkspaceMember[]
-  documents Document[]
+  items     KnowledgeItem[]   @relation("WorkspaceItems")
   spaces    Space[]
   edges     Edge[]
   aiUsage   AIUsage[]
 }
 
-model Edge {
-  id          String   @id @default(uuid())
-  type        String   // SUPPORTS, CONTRADICTS, RELATED
-  sourceId    String
-  targetId    String
-  workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id])
-  createdAt   DateTime @default(now())
-}
-
-model AIUsage {
-  id          String   @id @default(uuid())
-  workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id])
-  action      String
-  model       String
-  tokens      Int      @default(0)
-  createdAt   DateTime @default(now())
-}
-
 model WorkspaceMember {
-  id          String    @id @default(uuid())
-  role        Role      @default(VIEWER)
+  id          String   @id @default(uuid())
+  role        Role     @default(VIEWER)
   userId      String
   workspaceId String
-  user        User      @relation(fields: [userId], references: [id])
-  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([userId, workspaceId])
 }
 
-model Document {
+
+model KnowledgeItem {
   id          String           @id @default(uuid())
   title       String
-  content     String           @db.Text
-  summary     String?          @db.Text
+  content     String?          @db.Text 
+  summary     String?          @db.Text 
+  sourceUrl   String?          
+  
+  type        KnowledgeType    @default(TEXT)
   status      ProcessingStatus @default(PENDING)
+  metadata    Json?          
+  
   workspaceId String
-  workspace   Workspace        @relation(fields: [workspaceId], references: [id])
+  workspace   Workspace        @relation("WorkspaceItems", fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  createdById String?
+  createdBy   User?            @relation(fields: [createdById], references: [id])
+
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  chunks DocumentChunk[]
-  entities EntityOnDocument[]
+  chunks      DocumentChunk[]
+  entities    EntityOnDocument[]
+  tags        Tag[]            @relation("ItemTags")
 }
+
+model DocumentChunk {
+  id              String                 @id @default(uuid())
+  content         String                 @db.Text
+  embedding       Unsupported("vector")? 
+  knowledgeItemId String
+  item            KnowledgeItem          @relation(fields: [knowledgeItemId], references: [id], onDelete: Cascade)
+  metadata        Json?                 
+}
+
 
 model Entity {
   id          String   @id @default(uuid())
-  kgId        String   @unique 
+  kgId        String   @unique  // Knowledge Graph ID
   name        String
+  type        String   // Person, Organization, Concept, etc.
   description String?  @db.Text
   imageUrl    String?
   url         String?
-  type        String?  
-  createdAt   DateTime @default(now())
-
+  
   documents   EntityOnDocument[]
+  
+  @@index([name])
 }
 
 model EntityOnDocument {
   documentId String
   entityId   String
-  confidence Float
+  confidence Float   @default(0.0)
 
-  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  entity     Entity   @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  document   KnowledgeItem @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  entity     Entity        @relation(fields: [entityId], references: [id], onDelete: Cascade)
 
   @@id([documentId, entityId])
 }
 
-model DocumentChunk {
-  id         String                 @id @default(uuid())
-  content    String                 @db.Text
-  embedding  Unsupported("vector")?
-  documentId String
-  document   Document               @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  metadata   Json?
+model Tag {
+  id    String          @id @default(uuid())
+  name  String          @unique
+  items KnowledgeItem[] @relation("ItemTags")
 }
+
 
 model Space {
   id          String    @id @default(uuid())
   name        String
   workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -136,10 +148,28 @@ model Space {
 
 model SpaceElement {
   id        String   @id @default(uuid())
-  type      String // "note", "shape", "connector"
-  content   Json // Position, text, properties
+  type      String   // "note", "shape", "connector"
+  content   Json     // Position, text, properties
   spaceId   String
   space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+}
+
+model Edge {
+  id          String    @id @default(uuid())
+  type        String    // SUPPORTS, CONTRADICTS, RELATED
+  sourceId    String
+  targetId    String
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+}
+
+model AIUsage {
+  id          String    @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  action      String
+  model       String
+  tokens      Int       @default(0)
+  createdAt   DateTime  @default(now())
 }

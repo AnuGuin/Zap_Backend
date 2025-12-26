@@ -19,7 +19,8 @@ import app from './app';
 import { env } from './config/env';
 import { setupSpacesSocket } from './modules/spaces/spaces.socket';
 import { logger } from './utils/logger';
-import './events/events'
+import './events/events';
+import './workers'; // Initialize all workers
 
 const server = http.createServer(app);
 
